@@ -93,12 +93,21 @@
       </svg>
     );
 
+    const DownloadIcon = ({ size = 20, className = "" }) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    );
+
     const App = () => {
       // --- ESTADOS GLOBALES ---
       const [activeTab, setActiveTab] = useState('stories'); 
       const [format, setFormat] = useState('portrait'); 
       const [isDownloading, setIsDownloading] = useState(false);
       const [previewImage, setPreviewImage] = useState(null); 
+      const [errorMsg, setErrorMsg] = useState("");
       const canvasRef = useRef(null);
 
       // --- CONFIGURACIÓN DE BRANDING ---
@@ -106,14 +115,14 @@
         background: '#0B132B', text: '#F4F1DE', accent: '#C29B40'
       });
 
-      // --- ESTADOS DE CONTENIDO ---
-      const [title, setTitle] = useState("Lecturas del Mes");
-      const [author, setAuthor] = useState("Nombre del Autor");
-      const [subtitle, setSubtitle] = useState("@laslecturasdeloli");
-      const [quoteText, setQuoteText] = useState("Escribe aquí una cita corta...");
-      const [rating, setRating] = useState(5);
-      const [pagesRead, setPagesRead] = useState("Página 124 de 350");
+      // --- ESTADOS DE CONTENIDO VACÍOS ---
+      const [title, setTitle] = useState("");
+      const [author, setAuthor] = useState("");
+      const [subtitle, setSubtitle] = useState("");
+      const [quoteText, setQuoteText] = useState("");
+      const [pagesRead, setPagesRead] = useState("");
       const [listItems, setListItems] = useState(["Libro 1", "Libro 2", "Libro 3"]);
+      const [rating, setRating] = useState(5); // <-- FIX: Se restablece el estado de rating
       
       // --- ESTADO WRAP UP (9 LIBROS) ---
       const [wrapUpItems, setWrapUpItems] = useState(
@@ -184,22 +193,20 @@
         setListItems(newList);
       };
 
-      // NUEVO GENERADOR USANDO HTML2CANVAS (Anti-bloqueos de iOS)
+      // GENERADOR USANDO HTML2CANVAS (Anti-bloqueos de iOS)
       const generateImage = async () => {
         if (!window.html2canvas) {
-          alert("La librería de dibujo aún se está cargando. Espera un segundo.");
+          setErrorMsg("La librería de dibujo aún se está cargando. Espera un segundo.");
           return;
         }
         setIsDownloading(true);
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
         try {
-          // Esperamos para asegurar que las fotos estén completamente procesadas por React
           await new Promise(resolve => setTimeout(resolve, 400));
           
-          // html2canvas dibuja la pantalla elemento por elemento, saltándose la protección de Safari
           const canvas = await window.html2canvas(canvasRef.current, {
-            scale: isMobile ? 2 : 2.5, // Altísima resolución pero optimizada para RAM de móvil
+            scale: isMobile ? 2 : 2.5, 
             backgroundColor: brandingColors.background,
             useCORS: true,
             allowTaint: true,
@@ -210,7 +217,7 @@
           setPreviewImage(dataUrl);
         } catch (err) { 
           console.error(err);
-          alert("Hubo un error al generar la imagen. Intenta con una portada más pequeña.");
+          setErrorMsg("Hubo un error al generar la imagen. Intenta con una portada más pequeña.");
         } finally { 
           setIsDownloading(false); 
         }
@@ -219,19 +226,46 @@
       return (
         <div className="min-h-screen bg-slate-200 flex flex-col md:flex-row font-sans">
           
+          {/* MENSAJE DE NOTIFICACIÓN PERSONALIZADO (Evita alerts nativos) */}
+          {errorMsg && (
+            <div className="fixed inset-0 z-[110] bg-black/80 flex items-center justify-center p-4">
+              <div className="bg-white p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-2xl">
+                <h3 className="text-red-600 font-bold text-lg">Suite de Diseño</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">{errorMsg}</p>
+                <button 
+                  onClick={() => setErrorMsg("")}
+                  className="w-full py-3 text-white rounded-xl font-bold transition-all hover:opacity-90"
+                  style={{ backgroundColor: brandingColors.accent }}
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* MODAL DE VISTA PREVIA (Para guardar en iOS) */}
           {previewImage && (
             <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-4">
               <div className="bg-white p-1 rounded-lg mb-6 shadow-2xl max-w-full overflow-hidden">
-                <img src={previewImage} className="max-h-[75vh] object-contain" alt="Resultado Final" />
+                <img src={previewImage} className="max-h-[70vh] object-contain" alt="Resultado Final" />
               </div>
-              <div className="text-center space-y-4 max-w-xs">
-                <p className="text-white font-bold text-sm italic">
-                  ¡Diseño listo! Mantén presionada la imagen de arriba y elige <span className="text-[#C29B40]">"Guardar en Fotos"</span>.
+              <div className="text-center space-y-4 w-full max-w-xs px-2">
+                <p className="text-white font-bold text-xs italic">
+                  ¡Diseño listo! Haz clic abajo para descargar o mantén presionada la imagen para guardarla.
                 </p>
+                
+                {/* BOTÓN DE DESCARGA DIRECTA */}
+                <a 
+                  href={previewImage} 
+                  download={`LoliSuite-${title || 'Lectura'}.jpg`}
+                  className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all"
+                >
+                  <DownloadIcon size={20} /> Guardar en Dispositivo
+                </a>
+
                 <button 
                   onClick={() => setPreviewImage(null)}
-                  className="w-full py-4 bg-[#C29B40] text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg"
+                  className="w-full py-4 bg-[#C29B40] text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:opacity-90 transition-all"
                   style={{ backgroundColor: brandingColors.accent }}
                 >
                   <XIcon size={20} /> Volver al Editor
@@ -315,12 +349,33 @@
 
                 <div className="space-y-3 pt-2">
                   <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Información</label>
-                  <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="Subtítulo (@laslecturasdeloli)" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm outline-none" />
-                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título Principal" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none" />
+                  
+                  {/* INPUTS CON PLACEHOLDERS */}
+                  <input 
+                    type="text" 
+                    value={subtitle} 
+                    onChange={(e) => setSubtitle(e.target.value)} 
+                    placeholder="@laslecturasdeloli" 
+                    className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm outline-none" 
+                  />
+                  
+                  <input 
+                    type="text" 
+                    value={title} 
+                    onChange={(e) => setTitle(e.target.value)} 
+                    placeholder="Lecturas del Mes" 
+                    className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none" 
+                  />
                   
                   {activeTab === 'stories' && (
                     <>
-                      <input type="text" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Autor" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm outline-none" />
+                      <input 
+                        type="text" 
+                        value={author} 
+                        onChange={(e) => setAuthor(e.target.value)} 
+                        placeholder="Nombre del Autor" 
+                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm outline-none" 
+                      />
                       <div className="py-1 flex items-center justify-between">
                         <label className="text-[10px] uppercase font-bold text-slate-400">Puntuación</label>
                         <div className="flex gap-1">
@@ -343,7 +398,15 @@
                     />
                   )}
 
-                  {activeTab === 'quotes' && <input type="text" value={pagesRead} onChange={(e) => setPagesRead(e.target.value)} placeholder="Ej: Página 140 de 300" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm" />}
+                  {activeTab === 'quotes' && (
+                    <input 
+                      type="text" 
+                      value={pagesRead} 
+                      onChange={(e) => setPagesRead(e.target.value)} 
+                      placeholder="Página 124 de 350" 
+                      className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm" 
+                    />
+                  )}
 
                   {activeTab === 'lists' && (
                     <div className="space-y-2">
@@ -433,11 +496,11 @@
                 <div className={`relative z-10 w-full ${format === 'square' ? 'mb-4' : 'mt-2'}`}>
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <div className="h-[1px] w-6 opacity-30" style={{ backgroundColor: brandingColors.accent }}></div>
-                    <span className="text-[9px] tracking-[0.4em] uppercase font-bold" style={{ color: brandingColors.accent }}>{subtitle}</span>
+                    <span className="text-[9px] tracking-[0.4em] uppercase font-bold" style={{ color: brandingColors.accent }}>{subtitle || "@laslecturasdeloli"}</span>
                     <div className="h-[1px] w-6 opacity-30" style={{ backgroundColor: brandingColors.accent }}></div>
                   </div>
-                  <h2 className={`${format === 'square' ? 'text-xl' : 'text-2xl'} font-bold tracking-tight px-4 leading-tight`} style={{ fontFamily: 'Cinzel, serif' }}>{title}</h2>
-                  {activeTab === 'stories' && <p className="text-[11px] italic opacity-70 mt-1 font-serif">{author}</p>}
+                  <h2 className={`${format === 'square' ? 'text-xl' : 'text-2xl'} font-bold tracking-tight px-4 leading-tight`} style={{ fontFamily: 'Cinzel, serif' }}>{title || "Lecturas del Mes"}</h2>
+                  {activeTab === 'stories' && <p className="text-[11px] italic opacity-70 mt-1 font-serif">{author || "Nombre del Autor"}</p>}
                 </div>
 
                 {/* CONTENIDO CENTRAL */}
@@ -447,7 +510,7 @@
                     <div className="space-y-4 flex flex-col items-center">
                       <div className={`${format === 'square' ? 'w-24 h-36' : 'w-28 h-40'} border shadow-2xl overflow-hidden bg-slate-900 rounded-sm relative`} style={{ borderColor: `${brandingColors.accent}4D` }}>
                         {bookCover ? (
-                          <div className="w-full h-full" style={{ backgroundImage: `url('${bookCover}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+                          <div className="w-full h-full animate-fade-in" style={{ backgroundImage: `url('${bookCover}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
                         ) : (
                           <BookIcon size={32} className="absolute inset-0 m-auto opacity-10" />
                         )}
@@ -457,13 +520,23 @@
                           <StarIcon key={i} size={format === 'square' ? 14 : 16} fill={i < rating ? brandingColors.accent : "none"} style={{ color: i < rating ? brandingColors.accent : brandingColors.text }} className={i < rating ? "" : "opacity-10"} />
                         ))}
                       </div>
-                      {quoteText && <div className="px-8 max-w-[280px] relative"><QuoteIcon size={14} className="absolute -top-3 left-2 opacity-20" style={{ color: brandingColors.accent }} /><p className="text-[12px] italic opacity-90 leading-relaxed font-serif">"{quoteText}"</p></div>}
+                      <div className="px-8 max-w-[280px] relative">
+                        <QuoteIcon size={14} className="absolute -top-3 left-2 opacity-20" style={{ color: brandingColors.accent }} />
+                        <p className="text-[12px] italic opacity-90 leading-relaxed font-serif">
+                          "{quoteText || "Escribe aquí una cita corta..."}"
+                        </p>
+                      </div>
                     </div>
                   )}
 
                   {activeTab === 'quotes' && (
                     <div className="space-y-6 flex flex-col items-center">
-                      <div className="px-8 relative"><QuoteIcon size={24} className="absolute -top-6 left-2 opacity-10" style={{ color: brandingColors.accent }} /><p className={`${format === 'square' ? 'text-lg' : 'text-xl'} leading-relaxed italic font-serif`}>"{quoteText}"</p></div>
+                      <div className="px-8 relative">
+                        <QuoteIcon size={24} className="absolute -top-6 left-2 opacity-10" style={{ color: brandingColors.accent }} />
+                        <p className={`${format === 'square' ? 'text-lg' : 'text-xl'} leading-relaxed italic font-serif`}>
+                          "{quoteText || "Escribe la cita del libro..."}"
+                        </p>
+                      </div>
                       <div className="flex flex-col items-center gap-2">
                         <span className="text-[9px] tracking-[0.3em] font-bold uppercase" style={{ color: brandingColors.accent }}>Actualmente Leyendo</span>
                         <div className="w-16 h-24 border shadow-xl bg-slate-900 rounded-sm overflow-hidden" style={{ borderColor: `${brandingColors.accent}4D` }}>
@@ -471,7 +544,7 @@
                             <div className="w-full h-full" style={{ backgroundImage: `url('${bookCover}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
                           )}
                         </div>
-                        <p className="text-[9px] tracking-widest opacity-60 font-sans italic uppercase">{pagesRead}</p>
+                        <p className="text-[9px] tracking-widest opacity-60 font-sans italic uppercase">{pagesRead || "Página 124 de 350"}</p>
                       </div>
                     </div>
                   )}
@@ -482,7 +555,7 @@
                         <div key={i} className="flex items-center gap-3">
                           <span className="font-bold text-lg" style={{ fontFamily: 'Cinzel, serif', color: brandingColors.accent }}>0{i+1}.</span>
                           <div className="h-[1px] flex-grow opacity-30" style={{ background: `linear-gradient(to right, ${brandingColors.accent}, transparent)` }}></div>
-                          <span className="text-md font-light italic" style={{ fontFamily: 'Playfair Display, serif' }}>{item}</span>
+                          <span className="text-md font-light italic" style={{ fontFamily: 'Playfair Display, serif' }}>{item || `Libro ${i+1}`}</span>
                         </div>
                       ))}
                     </div>
