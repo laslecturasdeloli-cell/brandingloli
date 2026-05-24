@@ -1,0 +1,463 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  Star, Feather, BookOpen, Quote, Upload, X, 
+  Download, Loader2, List, Type, Layout, Square, 
+  Smartphone, Trash2, Book, Settings, PenTool, 
+  Instagram, PlusCircle, Grid3X3, Image as ImageIcon,
+  Palette, Eye
+} from 'lucide-react';
+
+const App = () => {
+  // --- ESTADOS GLOBALES ---
+  const [activeTab, setActiveTab] = useState('stories'); 
+  const [format, setFormat] = useState('portrait'); 
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null); 
+  const canvasRef = useRef(null);
+
+  // --- CONFIGURACIÓN DE BRANDING ---
+  const [brandingColors, setBrandingColors] = useState({
+    background: '#0B132B', text: '#F4F1DE', accent: '#C29B40'
+  });
+
+  // --- ESTADOS DE CONTENIDO ---
+  const [title, setTitle] = useState("Lecturas del Mes");
+  const [author, setAuthor] = useState("Nombre del Autor");
+  const [subtitle, setSubtitle] = useState("@laslecturasdeloli");
+  const [quoteText, setQuoteText] = useState("Escribe aquí una cita corta...");
+  const [rating, setRating] = useState(5);
+  const [pagesRead, setPagesRead] = useState("Página 124 de 350");
+  const [listItems, setListItems] = useState(["Libro 1", "Libro 2", "Libro 3"]);
+  
+  // --- ESTADO WRAP UP (9 LIBROS) ---
+  const [wrapUpItems, setWrapUpItems] = useState(
+    Array(9).fill(null).map(() => ({ cover: null, rating: 5 }))
+  );
+  const [wrapUpBg, setWrapUpBg] = useState(null);
+
+  // --- ESTADOS DE IMÁGENES ---
+  const [bookCover, setBookCover] = useState(null);
+  const bookCoverInputRef = useRef(null);
+  const wrapBgInputRef = useRef(null);
+  const wrapItemInputRefs = useRef([]);
+
+  // Cargar html-to-image
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js';
+    script.async = true;
+    document.head.appendChild(script);
+  }, []);
+
+  // Función para comprimir y achicar imágenes en el celular antes de cargarlas
+  const resizeImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Si la imagen es gigante (foto de iPhone), la achicamos a un tamaño web estándar
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 1000;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Convertimos a JPEG de calidad media-alta para ahorrar un 90% de RAM
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImage = async (e, type, index = null) => {
+    const file = e.target.files[0];
+    if (file) {
+      const optimizedBase64 = await resizeImage(file);
+      if (type === 'main') setBookCover(optimizedBase64);
+      if (type === 'wrapBg') setWrapUpBg(optimizedBase64);
+      if (type === 'wrapItem') {
+        const newItems = [...wrapUpItems];
+        newItems[index].cover = optimizedBase64;
+        setWrapUpItems(newItems);
+      }
+    }
+  };
+
+  const updateWrapRating = (index, newRating) => {
+    const newItems = [...wrapUpItems];
+    newItems[index].rating = newRating;
+    setWrapUpItems(newItems);
+  };
+
+  const addListItem = () => setListItems([...listItems, ""]);
+  const removeListItem = (index) => setListItems(listItems.filter((_, i) => i !== index));
+  const updateListItem = (index, value) => {
+    const newList = [...listItems];
+    newList[index] = value;
+    setListItems(newList);
+  };
+
+  const generateImage = async () => {
+    if (!window.htmlToImage) return;
+    setIsDownloading(true);
+    
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    // Configuración anti-crasheos para iOS
+    const config = {
+      quality: 0.85, // Bajamos levemente para evitar saturación de RAM
+      pixelRatio: isMobile ? 1.5 : 2.5, // En celular un pixelRatio de 1.5 es ultra seguro y veloz
+      backgroundColor: brandingColors.background,
+    };
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const dataUrl = await window.htmlToImage.toJpeg(canvasRef.current, config);
+      setPreviewImage(dataUrl);
+    } catch (err) { 
+      console.error(err);
+      alert("El iPhone se quedó sin memoria para procesar las imágenes. Intenta usar portadas más livianas.");
+    } finally { 
+      setIsDownloading(false); 
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-200 flex flex-col md:flex-row font-sans overflow-hidden">
+      
+      {/* MODAL DE VISTA PREVIA (Para iOS) */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-4">
+          <div className="bg-white p-1 rounded-lg mb-6 shadow-2xl max-w-full overflow-hidden">
+            <img src={previewImage} className="max-h-[75vh] object-contain" alt="Resultado Final" />
+          </div>
+          <div className="text-center space-y-4 max-w-xs">
+            <p className="text-white font-bold text-sm italic">
+              ¡Diseño listo! Mantén presionada la imagen de arriba y elige <span className="text-[#C29B40]">"Guardar en Fotos"</span>.
+            </p>
+            <button 
+              onClick={() => setPreviewImage(null)}
+              className="w-full py-4 bg-[#C29B40] text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg"
+              style={{ backgroundColor: brandingColors.accent }}
+            >
+              <X size={20} /> Volver al Editor
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BARRA LATERAL (NAVEGACIÓN) */}
+      <div className="w-full md:w-72 bg-[#0B132B] text-white p-6 flex flex-col gap-6 shadow-2xl z-20 overflow-y-auto" style={{ backgroundColor: brandingColors.background }}>
+        <div className="flex items-center gap-3 border-b border-white/10 pb-6">
+          <div className="p-2 rounded-xl text-[#0B132B]" style={{ backgroundColor: brandingColors.accent }}>
+            <PenTool size={28} />
+          </div>
+          <div>
+            <h1 className="font-bold tracking-tight text-xl leading-tight" style={{ color: brandingColors.text }}>Loli's Suite</h1>
+            <p className="text-[10px] uppercase tracking-[0.2em] opacity-60" style={{ color: brandingColors.accent }}>Anti-Crashes</p>
+          </div>
+        </div>
+
+        <nav className="flex flex-col gap-2">
+          {[
+            { id: 'stories', label: 'Reseñas', icon: <Instagram size={20}/> },
+            { id: 'quotes', label: 'Citas', icon: <Type size={20}/> },
+            { id: 'lists', label: 'Listas', icon: <List size={20}/> },
+            { id: 'wrapup', label: 'Wrap Up', icon: <Grid3X3 size={20}/> },
+            { id: 'reels', label: 'Marcos Reels', icon: <Layout size={20}/> }
+          ].map(tab => (
+            <button 
+              key={tab.id}
+              onClick={() => {setActiveTab(tab.id); if(tab.id==='wrapup'||tab.id==='reels') setFormat('portrait');}}
+              className={`flex items-center gap-3 p-3.5 rounded-2xl transition-all ${activeTab === tab.id ? 'font-bold shadow-lg scale-[1.02]' : 'hover:bg-white/5 opacity-60'}`}
+              style={activeTab === tab.id ? { backgroundColor: brandingColors.accent, color: brandingColors.background } : { color: brandingColors.text }}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* ÁREA CENTRAL (EDITOR + PREVIEW) */}
+      <div className="flex-1 p-4 md:p-8 flex flex-col lg:flex-row gap-8 items-start justify-center overflow-y-auto bg-slate-100">
+        
+        {/* PANEL DE CONTROL */}
+        <div className="w-full max-w-md bg-white rounded-[2rem] shadow-xl p-6 space-y-6 overflow-y-auto max-h-full scrollbar-hide">
+          
+          {/* CONFIGURACIÓN DE COLORES */}
+          <div className="bg-slate-50 p-4 rounded-2xl space-y-3 border border-slate-100">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+              <Palette size={14} /> Colores Personalizados
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {['background', 'text', 'accent'].map(key => (
+                <div key={key} className="flex flex-col items-center gap-1">
+                  <input 
+                    type="color" 
+                    value={brandingColors[key]} 
+                    onChange={(e) => setBrandingColors({...brandingColors, [key]: e.target.value})} 
+                    className="w-full h-8 rounded-lg cursor-pointer border-none shadow-sm" 
+                  />
+                  <span className="text-[8px] font-bold text-slate-500 uppercase">{key}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Formato</label>
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button onClick={() => setFormat('portrait')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${format === 'portrait' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}>
+                  <Smartphone size={14} /> 9:16
+                </button>
+                {(activeTab !== 'wrapup' && activeTab !== 'reels') && (
+                  <button onClick={() => setFormat('square')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${format === 'square' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}>
+                    <Square size={14} /> 1:1
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Información</label>
+              <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="Subtítulo (@laslecturasdeloli)" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 outline-none" style={{ focusRingColor: brandingColors.accent }} />
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título Principal" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none" />
+              
+              {activeTab === 'stories' && (
+                <>
+                  <input type="text" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Autor" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm outline-none" />
+                  <div className="py-1 flex items-center justify-between">
+                    <label className="text-[10px] uppercase font-bold text-slate-400">Puntuación</label>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <button key={num} onClick={() => setRating(num)} style={{ color: rating >= num ? brandingColors.accent : '#e2e8f0' }}>
+                          <Star size={22} fill={rating >= num ? brandingColors.accent : "none"} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {(activeTab === 'stories' || activeTab === 'quotes') && (
+                <textarea 
+                  value={quoteText} 
+                  onChange={(e) => setQuoteText(e.target.value)} 
+                  className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm h-20 resize-none outline-none" 
+                  placeholder={activeTab === 'stories' ? "Escribe una cita corta..." : "Escribe la cita del libro..."}
+                />
+              )}
+
+              {activeTab === 'quotes' && <input type="text" value={pagesRead} onChange={(e) => setPagesRead(e.target.value)} placeholder="Ej: Página 140 de 300" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm" />}
+
+              {activeTab === 'lists' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-400">Ítems de Lista</label>
+                  {listItems.map((item, index) => (
+                    <div key={index} className="flex gap-2 items-center">
+                      <input type="text" value={item} onChange={(e) => updateListItem(index, e.target.value)} className="flex-grow p-2 bg-slate-50 border border-slate-100 rounded-lg text-sm" placeholder={`Ítem ${index + 1}`} />
+                      <button onClick={() => removeListItem(index)} className="text-red-400 hover:bg-red-50 p-1 rounded-lg"><Trash2 size={16} /></button>
+                    </div>
+                  ))}
+                  <button onClick={addListItem} className="w-full py-2 border-2 border-dashed rounded-xl text-[10px] font-bold flex items-center justify-center gap-2 transition-all hover:bg-slate-50" style={{ borderColor: `${brandingColors.accent}4D`, color: brandingColors.accent }}>
+                    <PlusCircle size={14} /> Añadir Ítem
+                  </button>
+                </div>
+              )}
+
+              {activeTab === 'wrapup' && (
+                <div className="space-y-4">
+                  <div className="p-4 border rounded-2xl flex flex-col items-center gap-2" style={{ backgroundColor: `${brandingColors.accent}11`, borderColor: `${brandingColors.accent}33` }}>
+                    <label className="text-[9px] font-bold uppercase tracking-widest" style={{ color: brandingColors.accent }}>Fondo Wrap Up</label>
+                    <button onClick={() => wrapBgInputRef.current.click()} className="text-[10px] font-bold bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-100 flex items-center gap-2">
+                      <ImageIcon size={14} style={{ color: brandingColors.accent }} /> {wrapUpBg ? "Cambiar" : "Subir Foto"}
+                    </button>
+                    <input type="file" ref={wrapBgInputRef} className="hidden" onChange={(e) => handleImage(e, 'wrapBg')} accept="image/*" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {wrapUpItems.map((item, idx) => (
+                      <div key={idx} className="flex flex-col gap-1">
+                        <div 
+                          onClick={() => wrapItemInputRefs.current[idx].click()}
+                          className="aspect-[3/4] bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-center cursor-pointer overflow-hidden relative"
+                        >
+                          {item.cover ? <img src={item.cover} className="w-full h-full object-cover" /> : <Book size={14} className="text-slate-200" />}
+                          <input type="file" ref={el => wrapItemInputRefs.current[idx] = el} className="hidden" onChange={(e) => handleImage(e, 'wrapItem', idx)} accept="image/*" />
+                        </div>
+                        <select 
+                          value={item.rating} 
+                          onChange={(e) => updateWrapRating(idx, parseInt(e.target.value))}
+                          className="text-[9px] p-1 bg-slate-50 border-none rounded-md outline-none"
+                        >
+                          {[1,2,3,4,5].map(n => <option key={n} value={n}>{n} ★</option>)}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Selector de Portada principal */}
+            {(activeTab === 'stories' || activeTab === 'quotes') && (
+              <div className="pt-2">
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-2">Portada Principal</label>
+                <div onClick={() => bookCoverInputRef.current.click()} className={`cursor-pointer p-8 border-2 border-dashed rounded-[2rem] text-center transition-all ${bookCover ? 'bg-orange-50' : 'border-slate-100 text-slate-300'}`} style={bookCover ? { borderColor: brandingColors.accent, color: brandingColors.accent } : {}}>
+                  {bookCover ? <span className="font-bold text-xs flex items-center justify-center gap-2 italic"><Book size={18}/> Portada Cargada</span> : <><Upload size={24} className="mx-auto mb-2 opacity-30" /><span className="text-[10px] font-bold uppercase tracking-widest">Tocar para Subir</span></>}
+                  <input type="file" ref={bookCoverInputRef} className="hidden" onChange={(e) => handleImage(e, 'main')} accept="image/*" />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* VISTA PREVIA (CANVAS) */}
+        <div className="flex flex-col items-center gap-6">
+          <div className="flex flex-col items-center">
+            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.4em] mb-4">Preview en Tiempo Real</div>
+            <div 
+              ref={canvasRef}
+              className={`relative shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col items-center text-center transition-all duration-500
+                ${format === 'square' ? 'w-[500px] h-[500px] justify-center p-8' : 'w-[360px] h-[640px] justify-between p-10'}`}
+              style={{ backgroundColor: brandingColors.background, color: brandingColors.text }}
+            >
+              {activeTab === 'wrapup' && wrapUpBg && (
+                <div className="absolute inset-0 z-0">
+                  <img src={wrapUpBg} className="w-full h-full object-cover opacity-20" />
+                  <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, ${brandingColors.background}CC, ${brandingColors.background})` }}></div>
+                </div>
+              )}
+              
+              <div className="absolute inset-4 border z-10 pointer-events-none" style={{ borderColor: `${brandingColors.accent}26` }}></div>
+
+              {/* HEADER */}
+              <div className={`relative z-10 w-full ${format === 'square' ? 'mb-4' : 'mt-2'}`}>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <div className="h-[1px] w-6 opacity-30" style={{ backgroundColor: brandingColors.accent }}></div>
+                  <span className="text-[9px] tracking-[0.4em] uppercase font-bold" style={{ color: brandingColors.accent }}>{subtitle}</span>
+                  <div className="h-[1px] w-6 opacity-30" style={{ backgroundColor: brandingColors.accent }}></div>
+                </div>
+                <h2 className={`${format === 'square' ? 'text-2xl' : 'text-3xl'} font-bold tracking-tight px-4 leading-tight`} style={{ fontFamily: 'Cinzel, serif' }}>{title}</h2>
+                {activeTab === 'stories' && <p className="text-[11px] italic opacity-70 mt-1 font-serif">{author}</p>}
+              </div>
+
+              {/* CONTENIDO CENTRAL */}
+              <div className={`relative z-10 w-full flex flex-col items-center justify-center ${format === 'square' ? 'flex-grow-0 py-4' : 'flex-grow py-6'}`}>
+                
+                {activeTab === 'stories' && (
+                  <div className="space-y-6 flex flex-col items-center">
+                    <div className={`${format === 'square' ? 'w-32 h-44' : 'w-40 h-56'} border shadow-2xl overflow-hidden bg-slate-900 rounded-sm relative`} style={{ borderColor: `${brandingColors.accent}4D` }}>
+                      {bookCover ? <img src={bookCover} className="w-full h-full object-cover" /> : <BookOpen size={32} className="absolute inset-0 m-auto opacity-10" />}
+                    </div>
+                    <div className="flex justify-center gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} size={format === 'square' ? 16 : 20} fill={i < rating ? brandingColors.accent : "none"} style={{ color: i < rating ? brandingColors.accent : brandingColors.text }} className={i < rating ? "" : "opacity-10"} />
+                      ))}
+                    </div>
+                    {quoteText && <div className="px-8 max-w-[300px] relative"><Quote size={14} className="absolute -top-3 left-2 opacity-20" style={{ color: brandingColors.accent }} /><p className="text-[13px] italic opacity-90 leading-relaxed font-serif">"{quoteText}"</p></div>}
+                  </div>
+                )}
+
+                {activeTab === 'quotes' && (
+                  <div className="space-y-8 flex flex-col items-center">
+                    <div className="px-8 relative"><Quote size={32} className="absolute -top-8 left-2 opacity-10" style={{ color: brandingColors.accent }} /><p className={`${format === 'square' ? 'text-2xl' : 'text-3xl'} leading-relaxed italic font-serif`}>"{quoteText}"</p></div>
+                    <div className="flex flex-col items-center gap-3">
+                      <span className="text-[10px] tracking-[0.3em] font-bold uppercase" style={{ color: brandingColors.accent }}>Actualmente Leyendo</span>
+                      <div className="w-20 h-28 border shadow-xl bg-slate-900 rounded-sm" style={{ borderColor: `${brandingColors.accent}4D` }}>{bookCover && <img src={bookCover} className="w-full h-full object-cover" />}</div>
+                      <p className="text-[10px] tracking-widest opacity-60 font-sans italic uppercase">{pagesRead}</p>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'lists' && (
+                  <div className="w-full px-10 space-y-4">
+                    {listItems.map((item, i) => (
+                      <div key={i} className="flex items-center gap-4">
+                        <span className="font-bold text-xl" style={{ fontFamily: 'Cinzel, serif', color: brandingColors.accent }}>0{i+1}.</span>
+                        <div className="h-[1px] flex-grow opacity-30" style={{ background: `linear-gradient(to right, ${brandingColors.accent}, transparent)` }}></div>
+                        <span className="text-lg font-light italic tracking-wide font-serif text-right">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {activeTab === 'wrapup' && (
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-6 w-full px-4">
+                    {wrapUpItems.map((item, i) => (
+                      <div key={i} className="flex flex-col items-center gap-1">
+                        <div className="aspect-[3/4] w-full border shadow-lg overflow-hidden bg-slate-900/50 rounded-sm" style={{ borderColor: `${brandingColors.accent}4D` }}>
+                          {item.cover && <img src={item.cover} className="w-full h-full object-cover" />}
+                        </div>
+                        <div className="flex gap-[1.5px]">
+                          {[...Array(5)].map((_, s) => (
+                            <Star key={s} size={7} fill={s < item.rating ? brandingColors.accent : "none"} style={{ color: s < item.rating ? brandingColors.accent : brandingColors.text }} className={s < item.rating ? "" : "opacity-10"} />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {activeTab === 'reels' && (
+                  <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed rounded-[3rem] p-8" style={{ borderColor: `${brandingColors.accent}26`, backgroundColor: `${brandingColors.background}44` }}>
+                    <Smartphone className="opacity-10 mb-2" size={48} />
+                    <p className="text-[9px] uppercase tracking-[0.3em] opacity-30">Contenido del Reel</p>
+                  </div>
+                )}
+              </div>
+
+              {/* FOOTER */}
+              <div className={`relative z-10 w-full ${format === 'square' ? 'mt-4' : 'mb-2'}`}>
+                <div className="flex items-center justify-center gap-2 text-[10px] tracking-widest uppercase opacity-40 font-sans">
+                  <Feather size={12} style={{ color: brandingColors.accent }} />
+                  <span>@laslecturasdeloli</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <button 
+            onClick={generateImage} 
+            disabled={isDownloading} 
+            className="w-full max-w-[360px] py-4 bg-white text-[#0B132B] rounded-2xl font-bold flex items-center justify-center gap-3 hover:opacity-90 transition-all shadow-xl active:scale-95 disabled:opacity-50 border border-slate-200"
+          >
+            {isDownloading ? <Loader2 className="animate-spin text-[#C29B40]" /> : <Eye size={20} style={{ color: brandingColors.accent }} />} 
+            <span className="uppercase tracking-widest text-sm">Generar Imagen</span>
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Playfair+Display:ital,wght@1,400&family=Montserrat:wght@400;700&display=swap');
+        .font-sans { font-family: 'Montserrat', sans-serif; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+    </div>
+  );
+};
+
+export default App;
