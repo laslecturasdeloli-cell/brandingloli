@@ -28,7 +28,7 @@
   <script type="text/babel">
     const { useState, useRef, useEffect } = React;
 
-    // --- ICONOS SVG LIVIANOS (Para evitar importar librerías pesadas) ---
+    // --- ICONOS SVG LIVIANOS ---
     const StarIcon = ({ size = 20, fill = "none", className = "", style = {} }) => (
       <svg className={className} style={style} width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
@@ -127,7 +127,7 @@
       const wrapBgInputRef = useRef(null);
       const wrapItemInputRefs = useRef([]);
 
-      // Función para comprimir fotos en el celular antes de procesar
+      // Compresión de fotos en móvil
       const resizeImage = (file) => {
         return new Promise((resolve) => {
           const reader = new FileReader();
@@ -137,24 +137,15 @@
               const canvas = document.createElement('canvas');
               let width = img.width;
               let height = img.height;
-
               const MAX_WIDTH = 800;
               const MAX_HEIGHT = 1000;
 
               if (width > height) {
-                if (width > MAX_WIDTH) {
-                  height *= MAX_WIDTH / width;
-                  width = MAX_WIDTH;
-                }
+                if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
               } else {
-                if (height > MAX_HEIGHT) {
-                  width *= MAX_HEIGHT / height;
-                  height = MAX_HEIGHT;
-                }
+                if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
               }
-
-              canvas.width = width;
-              canvas.height = height;
+              canvas.width = width; canvas.height = height;
               const ctx = canvas.getContext('2d');
               ctx.drawImage(img, 0, 0, width, height);
               resolve(canvas.toDataURL('image/jpeg', 0.8));
@@ -196,21 +187,16 @@
       const generateImage = async () => {
         if (!window.htmlToImage) return;
         setIsDownloading(true);
-        
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
         const config = {
           quality: 0.92, 
-          pixelRatio: isMobile ? 2 : 2.5, // Subimos a 2 porque el nuevo formato de fondo es ultra liviano
+          pixelRatio: isMobile ? 2 : 2.5, 
           backgroundColor: brandingColors.background,
-          style: {
-            transform: 'scale(1)',
-            webkitTransform: 'scale(1)'
-          }
+          style: { transform: 'scale(1)', webkitTransform: 'scale(1)' }
         };
 
         try {
-          // Esperamos a que el sistema procese el renderizado
           await new Promise(resolve => setTimeout(resolve, 400));
           const dataUrl = await window.htmlToImage.toJpeg(canvasRef.current, config);
           setPreviewImage(dataUrl);
@@ -223,9 +209,9 @@
       };
 
       return (
-        <div className="min-h-screen bg-slate-200 flex flex-col md:flex-row font-sans overflow-hidden">
+        <div className="min-h-screen bg-slate-200 flex flex-col md:flex-row font-sans">
           
-          {/* MODAL DE VISTA PREVIA (Para iOS) */}
+          {/* MODAL DE VISTA PREVIA (Para guardar en iOS) */}
           {previewImage && (
             <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-4">
               <div className="bg-white p-1 rounded-lg mb-6 shadow-2xl max-w-full overflow-hidden">
@@ -247,7 +233,7 @@
           )}
 
           {/* BARRA LATERAL (NAVEGACIÓN) */}
-          <div className="w-full md:w-72 bg-[#0B132B] text-white p-6 flex flex-col gap-6 shadow-2xl z-20 overflow-y-auto" style={{ backgroundColor: brandingColors.background }}>
+          <div className="w-full md:w-72 bg-[#0B132B] text-white p-6 flex flex-col gap-6 shadow-2xl z-20 md:sticky md:top-0 md:h-screen overflow-y-auto" style={{ backgroundColor: brandingColors.background }}>
             <div className="flex items-center gap-3 border-b border-white/10 pb-6">
               <div className="p-2 rounded-xl text-[#0B132B]" style={{ backgroundColor: brandingColors.accent }}>
                 <FeatherIcon size={28} />
@@ -278,8 +264,8 @@
             </nav>
           </div>
 
-          {/* ÁREA CENTRAL (EDITOR + PREVIEW) */}
-          <div className="flex-grow p-4 md:p-8 flex flex-col lg:flex-row gap-8 items-center lg:items-start justify-start lg:justify-center overflow-y-auto bg-slate-100 h-screen">
+          {/* ÁREA CENTRAL */}
+          <div className="flex-grow p-4 sm:p-6 md:p-8 flex flex-col lg:flex-row gap-8 items-center lg:items-start justify-center bg-slate-100 min-h-screen">
             
             {/* PANEL DE CONTROL */}
             <div className="w-full max-w-md bg-white rounded-[2rem] shadow-xl p-6 space-y-6 flex-shrink-0">
@@ -340,14 +326,14 @@
                     </>
                   )}
 
-                  {(activeTab === 'stories' || activeTab === 'quotes') && (
+                  {(activeTab === 'stories' || activeTab === 'quotes' && (
                     <textarea 
                       value={quoteText} 
                       onChange={(e) => setQuoteText(e.target.value)} 
                       className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm h-20 resize-none outline-none" 
                       placeholder={activeTab === 'stories' ? "Escribe una cita corta..." : "Escribe la cita del libro..."}
                     />
-                  )}
+                  ))}
 
                   {activeTab === 'quotes' && <input type="text" value={pagesRead} onChange={(e) => setPagesRead(e.target.value)} placeholder="Ej: Página 140 de 300" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm" />}
 
@@ -403,7 +389,7 @@
                   )}
                 </div>
 
-                {/* Selector de Portada principal */}
+                {/* Portada principal */}
                 {(activeTab === 'stories' || activeTab === 'quotes') && (
                   <div className="pt-2">
                     <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-2">Portada Principal</label>
@@ -425,7 +411,7 @@
                   ${format === 'square' ? 'w-[450px] h-[450px] justify-center p-8' : 'w-[320px] h-[568px] justify-between p-8'}`}
                 style={{ backgroundColor: brandingColors.background, color: brandingColors.text }}
               >
-                {/* Fondo decorativo opcional para Wrap Up con corrección de WebKit */}
+                {/* Fondo Wrap Up con corrección CSS para Safari */}
                 {activeTab === 'wrapup' && wrapUpBg && (
                   <div className="absolute inset-0 z-0">
                     <div className="w-full h-full opacity-20" style={{ backgroundImage: `url(${wrapUpBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
@@ -453,7 +439,7 @@
                     <div className="space-y-4 flex flex-col items-center">
                       <div className={`${format === 'square' ? 'w-24 h-36' : 'w-28 h-40'} border shadow-2xl overflow-hidden bg-slate-900 rounded-sm relative`} style={{ borderColor: `${brandingColors.accent}4D` }}>
                         {bookCover ? (
-                          <div className="w-full h-full animate-fade-in" style={{ backgroundImage: `url(${bookCover})`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+                          <div className="w-full h-full" style={{ backgroundImage: `url(${bookCover})`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
                         ) : (
                           <BookIcon size={32} className="absolute inset-0 m-auto opacity-10" />
                         )}
